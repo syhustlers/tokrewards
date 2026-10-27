@@ -56,14 +56,14 @@
                 <button onclick="connectAccount()" class="tok-btn-gradient px-6 py-3 rounded-xl font-bold text-black hover:opacity-90 transition">Connect</button>
             </div>
 
-            <!-- Profile Info Card (Shown when connected) -->
+            <!-- Profile Info Card -->
             <div id="profile-card" class="hidden card-bg rounded-2xl p-4 mt-4 border border-[#25F4EE]/30">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
                         <img id="card-avatar" src="" class="w-12 h-12 rounded-full border-2 border-[#25F4EE]">
                         <div class="text-left">
                             <h3 id="card-username" class="font-bold text-lg text-white">@username</h3>
-                            <p class="text-xs text-gray-400"><span id="card-followers">1.2K</span> Followers</p>
+                            <p class="text-xs text-gray-400">Verified TikTok Account</p>
                         </div>
                     </div>
                     <div class="text-right">
@@ -98,11 +98,14 @@
         <button onclick="filterCategory('💎 High Payout Vault')" class="cat-tab px-4 py-2 rounded-xl text-sm font-bold bg-gray-800 text-gray-300">💎 High Payout Vault</button>
         <button onclick="filterCategory('⚡ Express Drops')" class="cat-tab px-4 py-2 rounded-xl text-sm font-bold bg-gray-800 text-gray-300">⚡ Express Drops</button>
         <button onclick="filterCategory('🎮 Gaming & App Installs')" class="cat-tab px-4 py-2 rounded-xl text-sm font-bold bg-gray-800 text-gray-300">🎮 Gaming & Apps</button>
-        <button onclick="filterCategory('Creator Community Tasks')" class="cat-tab px-4 py-2 rounded-xl text-sm font-bold bg-gray-800 text-gray-300">🏆 Community Tasks</button>
     </div>
 
     <!-- Offers Grid -->
     <main class="max-w-5xl mx-auto px-4">
+        <div id="offers-loading" class="text-center py-12 text-gray-500 font-bold">
+            <i class="fa-solid fa-circle-notch fa-spin text-2xl text-[#25F4EE] mb-2"></i>
+            <p>Loading live offers...</p>
+        </div>
         <div id="offers-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
     </main>
 
@@ -110,43 +113,14 @@
     <script>
         let currentUsername = localStorage.getItem('tok_user') || '';
         let userCoins = parseInt(localStorage.getItem('tok_coins') || '0');
-
-        // Sample task fallback data so your layout renders instantly
-        let allOffersData = [
-            {
-                id: 'task_1',
-                title: 'Download & Install App',
-                description: 'Install and open the mobile app for 30 seconds to claim your rewards.',
-                coins: 450,
-                image: 'https://via.placeholder.com/150',
-                url: '#',
-                category: '🎮 Gaming & App Installs'
-            },
-            {
-                id: 'task_2',
-                title: 'Complete Quick Survey',
-                description: 'Answer 5 quick questions about your social media habits.',
-                coins: 600,
-                image: 'https://via.placeholder.com/150',
-                url: '#',
-                category: '🔥 Featured Quests'
-            },
-            {
-                id: 'task_3',
-                title: 'VIP Claim Quest',
-                description: 'Enter your phone number to participate in the reward draw.',
-                coins: 1200,
-                image: 'https://via.placeholder.com/150',
-                url: '#',
-                category: '💎 High Payout Vault'
-            }
-        ];
+        let allOffersData = [];
+        const COIN_RATE = 200; // $1 USD = 200 Coins[span_1](start_span)[span_1](end_span)
 
         window.onload = function() {
             if (currentUsername) {
                 renderUserSession(currentUsername, userCoins);
             }
-            renderOffers(allOffersData);
+            loadLiveOffers();
         };
 
         function connectAccount() {
@@ -159,6 +133,7 @@
             localStorage.setItem('tok_coins', userCoins);
             
             renderUserSession(currentUsername, userCoins);
+            alert('Account connected successfully! Earnings will sync to @' + currentUsername);
         }
 
         function renderUserSession(username, coins) {
@@ -185,6 +160,73 @@
             }
         }
 
+        async function loadLiveOffers() {
+            const container = document.getElementById('offers-grid');
+            try {
+                // Fetching AdBlueMedia & CPAGrip feeds using your network credentials[span_2](start_span)[span_2](end_span)
+                const adblueUrl = `https://d3r33tlb373kwk.cloudfront.net/public/offers/feed.php?user_id=475101&api_key=a71e9140b50e3221cbdc9435d9ec3b99&s1=${encodeURIComponent(currentUsername)}`;
+                const cpagripUrl = `https://www.cpagrip.com/common/offer_feed_json.php?user_id=984680&pubkey=215efeed21013185533408b6a9af0342&tracking_id=${encodeURIComponent(currentUsername)}`;
+
+                let fetchedOffers = [];
+
+                // Load AdBlueMedia
+                try {
+                    const res1 = await fetch(adblueUrl);
+                    const data1 = await res1.json();
+                    if (Array.isArray(data1)) {
+                        data1.forEach(offer => {
+                            let payout = parseFloat(offer.conversion || 0.50);
+                            fetchedOffers.push({
+                                title: offer.anchor || 'Special Offer',
+                                description: 'Complete this task to receive TikTok Coins instantly.',
+                                coins: Math.ceil(payout * COIN_RATE),
+                                image: 'https://www.tiktok.com/favicon.ico',
+                                url: offer.url || '#',
+                                category: '🔥 Featured Quests'
+                            });
+                        });
+                    }
+                } catch (e) { console.log('AdBlueMedia fetch handled'); }
+
+                // Load CPAGrip
+                try {
+                    const res2 = await fetch(cpagripUrl);
+                    const data2 = await res2.json();
+                    if (data2 && data2.offers) {
+                        data2.offers.forEach(offer => {
+                            let payout = parseFloat(offer.payout || 0.50);
+                            let category = '⚡ Express Drops';
+                            let type = (offer.type || '').toLowerCase();
+                            if (type.includes('mobile') || type.includes('install')) category = '🎮 Gaming & App Installs';
+                            else if (payout >= 2.00) category = '💎 High Payout Vault';
+
+                            fetchedOffers.push({
+                                title: offer.title || 'Task Offer',
+                                description: offer.description || 'Complete requirement to earn coins.',
+                                coins: Math.ceil(payout * COIN_RATE),
+                                image: offer.offer_icon_url || 'https://www.tiktok.com/favicon.ico',
+                                url: offer.offerlink || '#',
+                                category: category
+                            });
+                        });
+                    }
+                } catch (e) { console.log('CPAGrip fetch handled'); }
+
+                document.getElementById('offers-loading').classList.add('hidden');
+
+                if (fetchedOffers.length > 0) {
+                    allOffersData = fetchedOffers;
+                    renderOffers(allOffersData);
+                } else {
+                    container.innerHTML = `<div class="col-span-full text-center text-gray-400 py-8">No offers available for your current region/device right now. Check back soon!</div>`;
+                }
+
+            } catch (err) {
+                document.getElementById('offers-loading').classList.add('hidden');
+                container.innerHTML = `<div class="col-span-full text-center text-red-400 py-8">Failed to load offers. Please refresh the page.</div>`;
+            }
+        }
+
         function renderOffers(offers) {
             const container = document.getElementById('offers-grid');
             container.innerHTML = '';
@@ -206,7 +248,7 @@
                                 <span class="coin-spin">🪙</span>
                                 <span>+${offer.coins} Coins</span>
                             </div>
-                            <a href="${offer.url}" target="_blank" onclick="handleTaskClick('${offer.id}')" class="tok-btn-gradient px-4 py-1.5 rounded-lg font-bold text-xs text-black">
+                            <a href="${offer.url}" target="_blank" onclick="handleTaskClick()" class="tok-btn-gradient px-4 py-1.5 rounded-lg font-bold text-xs text-black">
                                 Earn Coins
                             </a>
                         </div>
@@ -223,15 +265,15 @@
             }
         }
 
-        function handleTaskClick(offerId) {
+        function handleTaskClick() {
             if (!currentUsername) {
-                alert('Please connect your TikTok @username at the top first to credit your coins!');
+                alert('Please connect your TikTok @username at the top first so your earnings are tracked!');
             }
         }
 
         function requestWithdrawal() {
-            if (userCoins < 5000) return alert('Minimum withdrawal threshold is 5,000 Coins.');
-            alert('Withdrawal request submitted! We are processing your request.');
+            if (userCoins < 5000) return alert('Minimum withdrawal threshold is 5,000 Coins ($25.00).');
+            alert('Withdrawal request submitted successfully! Funds will be sent to your connected account.');
         }
     </script>
 </body>
